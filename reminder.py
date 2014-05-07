@@ -25,7 +25,7 @@ import re
 from urllib.request import urlopen, Request
 import json
 
-def remind(domain, room, auth, repos):
+def remind(domain, room, auth, repos, color):
     '''Collect open pull requests from repos and post links to room.'''
 
     base = 'https://%s' % domain
@@ -37,7 +37,7 @@ def remind(domain, room, auth, repos):
     # but it's fine in others
     msg = '\n\t'.join(urls)
     if msg:
-        _post('@here please get these reviewed:\n\t' + msg, room, auth)
+        _post('@here please get these reviewed:\n\t' + msg, room, auth, color)
 
 def _pulls(base, repo):
     '''Collect links to open pull requests from repo.'''
@@ -45,13 +45,14 @@ def _pulls(base, repo):
     data = urlopen('%s/repos/%s/pulls' % (base, repo)).read().decode('utf-8')
     return [p['html_url'] for p in json.loads(data)]
 
-def _post(msg, room, auth):
+def _post(msg, room, auth, color):
     '''Post a message to a HipChat room.'''
 
     url = 'https://api.hipchat.com/v2/room/%s/notification' % room
     data = json.dumps({
         'message': msg,
-        'message_format': 'text'
+        'message_format': 'text',
+        'color': color
     }).encode('utf-8')
     headers = {
         'Content-Type': 'application/json',
@@ -84,8 +85,12 @@ if __name__ == "__main__":
         '-a', '--auth', required=True,
         help='a room notification or personal token from HipChat')
     parser.add_argument(
+        '-c', '--color', default='yellow',
+        choices=['yellow', 'red', 'green', 'purple', 'gray', 'random'],
+        help='the background color to use for the notification')
+    parser.add_argument(
         'repos', nargs='+', type=_repo, metavar='repo',
         help='''one or more repositories to check for pull requests,
                 specified as "<owner>/<repo>"''')
     opts = parser.parse_args()
-    remind(opts.domain, opts.room, opts.auth, opts.repos)
+    remind(opts.domain, opts.room, opts.auth, opts.repos, opts.color)
