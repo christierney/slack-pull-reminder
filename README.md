@@ -17,11 +17,11 @@ https://www.hipchat.com/docs/apiv2/auth
 
 ### options
 
-* `-r`, `--read` [required]: the name or id of the HipChat room to notify
+* `-r`, `--room` [required]: the name or id of the HipChat room to notify
 * `-a`, `--auth` [required]: a HipChat v2 API auth token (personal or room)
 * `-d`, `--domain`: the GitHub domain to query (defaults to `api.github.com`.)
   Do not include protocol or path components. Example: `github.mydomain.com`.
-* '-c', '--color': the background color to use for the room notification.
+* `-c`, `--color`: the background color to use for the room notification.
   Choices are yellow, green, red, purple, gray, or random (defaults to yellow.)
 * `repos` [required]: one or more repositories to check for open pull requests.
   These are positional arguments and must come after all other options.
