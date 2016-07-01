@@ -23,26 +23,36 @@ Usage:
 import argparse
 import re
 from urllib.request import urlopen, Request
+import base64
 import json
 
-def remind(domain, room, auth, repos, color):
+def remind(domain, room, auth, user, pw, repos, color):
     '''Collect open pull requests from repos and post links to room.'''
 
     base = 'https://%s' % domain
     if domain != 'api.github.com':
         base += '/api/v3'
 
-    urls = [url for repo in repos for url in _pulls(base, repo)]
+    urls = [url for repo in repos for url in _pulls(base, repo, user, pw)]
     # note: \n\t won't render correctly in the linux client,
     # but it's fine in others
     msg = '\n\t'.join(urls)
     if msg:
         _post('@here please get these reviewed:\n\t' + msg, room, auth, color)
 
-def _pulls(base, repo):
+def _pulls(base, repo, user, pw):
     '''Collect links to open pull requests from repo.'''
 
-    data = urlopen('%s/repos/%s/pulls' % (base, repo)).read().decode('utf-8')
+    url = '%s/repos/%s/pulls' % (base, repo)
+    headers = {}
+    if pw is not None:
+        raw = "%s:%s" % (user, pw)
+        auth = "Basic " + base64.b64encode(raw.encode()).decode("ascii")
+        headers = {
+            'Authorization': auth
+        }
+
+    data = urlopen(Request(url, headers=headers)).read().decode('utf-8')
     return [p['html_url'] for p in json.loads(data)]
 
 def _post(msg, room, auth, color):
@@ -85,6 +95,12 @@ if __name__ == "__main__":
         '-a', '--auth', required=True,
         help='a room notification or personal token from HipChat')
     parser.add_argument(
+        '-u', '--user', required=False,
+        help='a GitHub username to pair with the password arg')
+    parser.add_argument(
+        '-p', '--password', required=False,
+        help='a password or personal access token from GitHub (for accessing private repos)')
+    parser.add_argument(
         '-c', '--color', default='yellow',
         choices=['yellow', 'red', 'green', 'purple', 'gray', 'random'],
         help='the background color to use for the notification')
@@ -93,4 +109,4 @@ if __name__ == "__main__":
         help='''one or more repositories to check for pull requests,
                 specified as "<owner>/<repo>"''')
     opts = parser.parse_args()
-    remind(opts.domain, opts.room, opts.auth, opts.repos, opts.color)
+    remind(opts.domain, opts.room, opts.auth, opts.user, opts.password, opts.repos, opts.color)
