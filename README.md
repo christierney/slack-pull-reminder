@@ -15,10 +15,17 @@ so devs who are waiting on reviews have to manually nag people.
 You will need a personal token or room notification token:
 https://www.hipchat.com/docs/apiv2/auth
 
+If you want to access a private repo, you will also need a personal access
+token: https://github.com/settings/tokens This token should have sufficient
+scope to read repo information.
+
 ### options
 
 * `-r`, `--room` [required]: the name or id of the HipChat room to notify
 * `-a`, `--auth` [required]: a HipChat v2 API auth token (personal or room)
+* `-u`, `--user`: a GitHub username (required if accessing a private repo)
+* `-p`, `--password`: a GitHub personal access token (required if accessing a
+  private repo)
 * `-d`, `--domain`: the GitHub domain to query (defaults to `api.github.com`.)
   Do not include protocol or path components. Example: `github.mydomain.com`.
 * `-c`, `--color`: the background color to use for the room notification.
