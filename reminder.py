@@ -3,21 +3,21 @@
 '''
 This script gathers a list of open pull requests
 from one or more GitHub repositories,
-and reports them to a HipChat room.
+and reports them to a Slack channel.
 
 The purpose is to gently remind people to deal with open requests,
 e.g. by reviewing, merging, or closing them.
 
 Usage:
     # report a single repo from github.com, using long param names:
-    reminder.py --room <HipChat room> --auth <HipChat token> user/repo
+    reminder.py --hook <webhook url> user/repo
 
     # report multiple repos:
-    reminder.py --room <room> --auth <auth> user1/repo1 org/repo2 user2/repo3
+    reminder.py --hook <webhook url> user1/repo1 org/repo2 user2/repo3
 
     # report a single repo from a GitHub Enterprise domain,
     # using short param names:
-    reminder.py -d <GitHub Enterprise domain> -r <room> -a <token> user/repo
+    reminder.py -d <GitHub Enterprise domain> -k <hook> user/repo
 '''
 
 import argparse
@@ -26,19 +26,16 @@ from urllib.request import urlopen, Request
 import base64
 import json
 
-def remind(domain, room, auth, user, pw, repos, color):
-    '''Collect open pull requests from repos and post links to room.'''
+def remind(domain, hook, user, pw, repos, color):
+    '''Collect open pull requests from repos and post links to channel.'''
 
     base = 'https://%s' % domain
     if domain != 'api.github.com':
         base += '/api/v3'
 
     urls = [url for repo in repos for url in _pulls(base, repo, user, pw)]
-    # note: \n\t won't render correctly in the linux client,
-    # but it's fine in others
-    msg = '\n\t'.join(urls)
-    if msg:
-        _post('@here please get these reviewed:\n\t' + msg, room, auth, color)
+    if urls:
+        _post(urls, hook, color)
 
 def _pulls(base, repo, user, pw):
     '''Collect links to open pull requests from repo.'''
@@ -55,21 +52,32 @@ def _pulls(base, repo, user, pw):
     data = urlopen(Request(url, headers=headers)).read().decode('utf-8')
     return [p['html_url'] for p in json.loads(data)]
 
-def _post(msg, room, auth, color):
-    '''Post a message to a HipChat room.'''
+def _post(urls, hook, color):
+    '''Post a message to a Slack channel.'''
 
-    url = 'https://api.hipchat.com/v2/room/%s/notification' % room
+    msg = 'Please complete %d review' % len(urls)
+    if (len(urls) > 1): msg += 's'
+
+    if (color == 'dynamic'): color = _choose_color(len(urls))
+
     data = json.dumps({
-        'message': msg,
-        'message_format': 'text',
-        'color': color
+        'attachments': [{
+            'fallback': msg.replace('complete', 'COMLETE'),
+            'pretext': msg,
+            'text' : '\n'.join(urls),
+            'color': color
+        }]
     }).encode('utf-8')
     headers = {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer %s' % auth
+        'Content-Type': 'application/json'
     }
-    urlopen(Request(url, data, headers)).close()
+    urlopen(Request(hook, data, headers)).close()
 
+def _choose_color(n):
+    if (n < 3): return 'good'
+    elif (n < 5): return 'warning'
+    elif (n < 10): return 'danger'
+    else: return '#000000'
 
 _VALID_REPO = re.compile(r"[^/]+/[^/]+")
 def _repo(arg):
@@ -89,11 +97,8 @@ if __name__ == "__main__":
         '-d', '--domain', default='api.github.com',
         help='your GitHub enterprise domain')
     parser.add_argument(
-        '-r', '--room', required=True,
-        help='the name or id of the room to notify')
-    parser.add_argument(
-        '-a', '--auth', required=True,
-        help='a room notification or personal token from HipChat')
+        '-k', '--hook', required=True,
+        help='the webhook URL from the slack app installation')
     parser.add_argument(
         '-u', '--user', required=False,
         help='a GitHub username to pair with the password arg')
@@ -101,12 +106,11 @@ if __name__ == "__main__":
         '-p', '--password', required=False,
         help='a password or personal access token from GitHub (for accessing private repos)')
     parser.add_argument(
-        '-c', '--color', default='yellow',
-        choices=['yellow', 'red', 'green', 'purple', 'gray', 'random'],
-        help='the background color to use for the notification')
+        '-c', '--color', default='dynamic',
+        help='the sidebar color to use for the notification')
     parser.add_argument(
         'repos', nargs='+', type=_repo, metavar='repo',
         help='''one or more repositories to check for pull requests,
                 specified as "<owner>/<repo>"''')
     opts = parser.parse_args()
-    remind(opts.domain, opts.room, opts.auth, opts.user, opts.password, opts.repos, opts.color)
+    remind(opts.domain, opts.hook, opts.user, opts.password, opts.repos, opts.color)
